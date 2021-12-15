@@ -1,19 +1,28 @@
 const express = require("express");
-
 const routes = express.Router();
+const {
+  register,
+  login,
+  logout,
+  getUser,
+  uploadZip,
+  getZips,
+  downloadZip,
+} = require("../controllers/auth");
+const authenticate = require("../middleware/verify-token");
 
-const { register, login, logout, uploadZip } = require("../controllers/auth");
-
-routes.get("/", function (req, res) {
-  res.send("Hello");
-});
+routes.get("/", authenticate, getUser);
 
 routes.post("/register", register);
 
 routes.post("/login", login);
 
-routes.post("/logout", logout);
+routes.post("/logout", authenticate, logout);
 
-routes.post("/uploadZip", uploadZip);
+routes.post("/uploadZip", authenticate, uploadZip);
+
+routes.get("/getZips", authenticate, getZips);
+
+routes.post("/downloadZip/:file_id", authenticate, downloadZip);
 
 module.exports = routes;

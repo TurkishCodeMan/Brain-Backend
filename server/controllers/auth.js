@@ -1,6 +1,9 @@
-const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const path = require("path");
+const fs = require("fs");
+const User = require("../models/User");
+const Job = require("../models/JobList");
 const singleFileUpload = require("../helper/singleFileUpload");
 
 const register = async (req, res) => {
@@ -58,18 +61,50 @@ const logout = (req, res) => {
   res.status(401).json({ status: false, message: "Logout" });
 };
 
+const getUser = async (req, res) => {
+  const user = await User.findOne(req.params.id);
+  const folders = await Job.findOne({ user_id: user.id });
+  res.status(200).json({ user: user, folders: folders });
+};
+
 const uploadZip = (req, res) => {
-  try {
-    singleFileUpload(req, res, function (error) {
-      if (error) {
+  singleFileUpload(req, res, async (error) => {
+    if (error) {
+      res.json(error).status(400);
+    } else {
+      try {
+        res.json([data]).status(201);
+      } catch (error) {
         res.json(error).status(400);
-      } else {
-        res.json(req.file).status(200);
       }
-    });
-  } catch (error) {
-    console.log("error", error);
+    }
+  });
+};
+
+const getZips = async (req, res) => {
+  const data = await Job.find({ user: req.query.id }).exec();
+  res.send(data);
+};
+
+const downloadZip = async (req, res) => {
+  try {
+    const folderPath = path.join(
+      __dirname + "../../server/../uploads/file-" + req.params.file_id + ".rar"
+    );
+    const file = fs.createReadStream(folderPath);
+    res.setHeader("Content-Disposition", 'attachment: filename="' + file + '"');
+    file.pipe(res);
+  } catch (err) {
+    console.log(err);
   }
 };
 
-module.exports = { register, login, logout, uploadZip };
+module.exports = {
+  register,
+  login,
+  logout,
+  getUser,
+  uploadZip,
+  getZips,
+  downloadZip,
+};
