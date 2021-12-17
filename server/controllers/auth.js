@@ -48,6 +48,7 @@ const login = async (req, res) => {
       const token = await jwt.sign(payload, process.env.JWT_SECRET_KEY, {
         expiresIn: 720,
       });
+      await User.updateOne({ id: user.id }, { token: token });
       res.json({ status: true, token: token });
     } else {
       res.json({ status: false, message: "Wrong password" });
@@ -62,7 +63,7 @@ const logout = (req, res) => {
 };
 
 const getUser = async (req, res) => {
-  const user = await User.findOne(req.params.id);
+  const user = await User.findOne({ token: req.query.token });
   const folders = await Job.findOne({ user_id: user.id });
   res.status(200).json({ user: user, folders: folders });
 };

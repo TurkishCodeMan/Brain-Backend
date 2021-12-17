@@ -14,6 +14,9 @@ const UserSchema = new Schema({
       "Please provide a valid name",
     ],
   },
+  token: {
+    type: String,
+  },
   password: {
     type: String,
     minlength: [6, "Please provide a password with min 6 lenght"],
