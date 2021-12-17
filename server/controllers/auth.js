@@ -48,7 +48,7 @@ const login = async (req, res) => {
       const token = await jwt.sign(payload, process.env.JWT_SECRET_KEY, {
         expiresIn: 720,
       });
-      await User.updateOne({ id: user.id }, { token: token });
+      await User.updateOne({ email: email }, { token: token });
       res.json({ status: true, token: token });
     } else {
       res.json({ status: false, message: "Wrong password" });
