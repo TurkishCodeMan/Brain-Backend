@@ -3,14 +3,14 @@ const multer = require("multer");
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "./uploads/" + req.query.id);
+    cb(null, "uploads/");
   },
   filename: async (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     await Job.create({
       user_id: req.query.id,
       fileName: uniqueSuffix + "-" + file.originalname,
-      status: "In Process",
+      status: "Ready",
     });
     cb(null, file.fieldname + "-" + uniqueSuffix + "-" + file.originalname);
   },

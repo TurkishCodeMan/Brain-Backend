@@ -46,7 +46,7 @@ const login = async (req, res) => {
         email,
       };
       const token = await jwt.sign(payload, process.env.JWT_SECRET_KEY, {
-        expiresIn: 720,
+        expiresIn: 720 * 60,
       });
       await User.updateOne({ email: email }, { token: token });
       res.json({ status: true, token: token });
@@ -108,7 +108,7 @@ const startProcess = async (req, res) => {
   const user = await User.findOne({ token: req.query.token });
 
   const folder = await Job.findOneAndUpdate(
-    { user_id: user.id },
+    { fileName: req.query.fileName },
     {
       status: "In Process",
     },
@@ -135,7 +135,17 @@ const startProcess = async (req, res) => {
 
   python.on("close", (code) => {
     console.log(`child process close all stdio with code ${code}`);
+    await Job.findOneAndUpdate(
+      { fileName: req.query.fileName },
+      {
+        status: "Completed",
+      },
+      {
+        new: true,
+      }
+    );
     res.send({
+      status: "Completed",
       PSNR: dataToSend,
     });
   });
@@ -151,9 +161,9 @@ var diretoryTreeToObj = function (dir, done) {
 
     if (!pending)
       return done(null, {
-        name: path.basename(dir),
-        type: "folder",
-        children: results,
+        label: path.basename(dir),
+        id: Math.round(Math.random(1000) + 12),
+        nodes: results,
       });
 
     list.forEach(function (file) {
@@ -162,16 +172,16 @@ var diretoryTreeToObj = function (dir, done) {
         if (stat && stat.isDirectory()) {
           diretoryTreeToObj(file, function (err, res) {
             results.push({
-              name: path.basename(file),
-              type: "folder",
-              children: res,
+              label: path.basename(file),
+              id: Math.round(Math.random(1000) + 12),
+              nodes: res,
             });
             if (!--pending) done(null, results);
           });
         } else {
           results.push({
-            type: "file",
-            name: path.basename(file),
+            id: Math.round(Math.random(1000) + 12),
+            label: path.basename(file),
           });
           if (!--pending) done(null, results);
         }
