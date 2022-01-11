@@ -14,8 +14,8 @@ const JobSchema = new Schema({
   status: {
     required: [true, "Please provide a Status"],
     type: String,
-    default: "In Process",
-    enum: ["In Process", "Ready"],
+    default: "Ready",
+    enum: ["Ready", "In Process", "Completed"],
   },
   createdAt: {
     type: Date,

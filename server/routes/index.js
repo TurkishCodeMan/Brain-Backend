@@ -8,6 +8,7 @@ const {
   uploadZip,
   getZips,
   downloadZip,
+  startProcess,
 } = require("../controllers/auth");
 const authenticate = require("../middleware/verify-token");
 
@@ -24,5 +25,7 @@ routes.post("/uploadZip", authenticate, uploadZip);
 routes.get("/getZips", authenticate, getZips);
 
 routes.post("/downloadZip/:file_id", authenticate, downloadZip);
+
+routes.post("/startProcess", authenticate, startProcess);
 
 module.exports = routes;

@@ -63,9 +63,13 @@ const logout = (req, res) => {
 };
 
 const getUser = async (req, res) => {
-  const user = await User.findOne({ token: req.query.token });
-  const folders = await Job.findOne({ user_id: user.id });
-  res.status(200).json({ user: user, folders: folders });
+  diretoryTreeToObj("C:/Users/ebube/Desktop/a", async function (err, data) {
+    if (err) console.error(err);
+
+    const user = await User.findOne({ token: req.query.token });
+    const folders = await Job.findOne({ user_id: user.id });
+    res.status(200).json({ user: user, directories: data, folders: folders });
+  });
 };
 
 const uploadZip = (req, res) => {
@@ -74,7 +78,7 @@ const uploadZip = (req, res) => {
       res.json(error).status(400);
     } else {
       try {
-        res.json([data]).status(201);
+        res.json({ status: true, message: "Upload Success" }).status(201);
       } catch (error) {
         res.json(error).status(400);
       }
@@ -100,6 +104,82 @@ const downloadZip = async (req, res) => {
   }
 };
 
+const startProcess = async (req, res) => {
+  const user = await User.findOne({ token: req.query.token });
+
+  const folder = await Job.findOneAndUpdate(
+    { user_id: user.id },
+    {
+      status: "In Process",
+    },
+    {
+      new: true,
+    }
+  );
+  const { spawn } = require("child_process");
+  var dataToSend;
+  const python = spawn("python", [
+    __dirname + "/mri_read_and_convert.py",
+    folder.fileName,
+    path.join(__dirname, "../uploads/" + user.id),
+  ]);
+
+  python.stdout.on("data", (data) => {
+    console.log("Pipe data from python script ...");
+    dataToSend = String(data);
+  });
+
+  python.stderr.on("data", (data) => {
+    console.error(`stderr: ${data}`);
+  });
+
+  python.on("close", (code) => {
+    console.log(`child process close all stdio with code ${code}`);
+    res.send({
+      PSNR: dataToSend,
+    });
+  });
+};
+
+var diretoryTreeToObj = function (dir, done) {
+  var results = [];
+
+  fs.readdir(dir, function (err, list) {
+    if (err) return done(err);
+
+    var pending = list.length;
+
+    if (!pending)
+      return done(null, {
+        name: path.basename(dir),
+        type: "folder",
+        children: results,
+      });
+
+    list.forEach(function (file) {
+      file = path.resolve(dir, file);
+      fs.stat(file, function (err, stat) {
+        if (stat && stat.isDirectory()) {
+          diretoryTreeToObj(file, function (err, res) {
+            results.push({
+              name: path.basename(file),
+              type: "folder",
+              children: res,
+            });
+            if (!--pending) done(null, results);
+          });
+        } else {
+          results.push({
+            type: "file",
+            name: path.basename(file),
+          });
+          if (!--pending) done(null, results);
+        }
+      });
+    });
+  });
+};
+
 module.exports = {
   register,
   login,
@@ -108,4 +188,5 @@ module.exports = {
   uploadZip,
   getZips,
   downloadZip,
+  startProcess,
 };
