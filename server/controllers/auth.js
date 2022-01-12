@@ -63,13 +63,15 @@ const logout = (req, res) => {
 };
 
 const getUser = async (req, res) => {
-  diretoryTreeToObj("C:/Users/ebube/Desktop/a", async function (err, data) {
-    if (err) console.error(err);
-
-    const user = await User.findOne({ token: req.query.token });
-    const folders = await Job.findOne({ user_id: user.id });
-    res.status(200).json({ user: user, directories: data, folders: folders });
-  });
+  const user = await User.findOne({ token: req.query.token });
+  const folders = await Job.find({ user_id: user.id }).sort({ createdAt: -1 });
+  diretoryTreeToObj(
+    path.join(__dirname, "../uploads/" + user.id), //nii.giz
+    async function (err, data) {
+      if (err) console.error(err);
+      res.status(200).json({ user: user, directories: data, folders: folders });
+    }
+  );
 };
 
 const uploadZip = (req, res) => {
@@ -86,15 +88,10 @@ const uploadZip = (req, res) => {
   });
 };
 
-const getZips = async (req, res) => {
-  const data = await Job.find({ user: req.query.id }).exec();
-  res.send(data);
-};
-
 const downloadZip = async (req, res) => {
   try {
     const folderPath = path.join(
-      __dirname + "../../server/../uploads/file-" + req.params.file_id + ".rar"
+      __dirname + "../../uploads/file-" + req.params.file_id + ".nii.gz"
     );
     const file = fs.createReadStream(folderPath);
     res.setHeader("Content-Disposition", 'attachment: filename="' + file + '"');
@@ -108,7 +105,7 @@ const startProcess = async (req, res) => {
   const user = await User.findOne({ token: req.query.token });
 
   const folder = await Job.findOneAndUpdate(
-    { fileName: req.query.fileName },
+    { user_id: user.id },
     {
       status: "In Process",
     },
@@ -121,7 +118,7 @@ const startProcess = async (req, res) => {
   const python = spawn("python", [
     __dirname + "/mri_read_and_convert.py",
     folder.fileName,
-    path.join(__dirname, "../uploads/" + user.id),
+    path.join(__dirname, "../uploads/" + user.id + "/" + folder.fileName),
   ]);
 
   python.stdout.on("data", (data) => {
@@ -133,10 +130,10 @@ const startProcess = async (req, res) => {
     console.error(`stderr: ${data}`);
   });
 
-  python.on("close", (code) => {
+  python.on("close", async (code) => {
     console.log(`child process close all stdio with code ${code}`);
     await Job.findOneAndUpdate(
-      { fileName: req.query.fileName },
+      { user_id: user.id },
       {
         status: "Completed",
       },
@@ -196,7 +193,6 @@ module.exports = {
   logout,
   getUser,
   uploadZip,
-  getZips,
   downloadZip,
   startProcess,
 };

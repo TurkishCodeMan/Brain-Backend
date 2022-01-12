@@ -6,7 +6,6 @@ const {
   logout,
   getUser,
   uploadZip,
-  getZips,
   downloadZip,
   startProcess,
 } = require("../controllers/auth");
@@ -21,8 +20,6 @@ routes.post("/login", login);
 routes.post("/logout", authenticate, logout);
 
 routes.post("/uploadZip", authenticate, uploadZip);
-
-routes.get("/getZips", authenticate, getZips);
 
 routes.post("/downloadZip/:file_id", authenticate, downloadZip);
 
