@@ -11,7 +11,7 @@ const {
 } = require("../controllers/auth");
 const authenticate = require("../middleware/verify-token");
 
-routes.get("/", authenticate, getUser);
+routes.get("/", getUser);
 
 routes.post("/register", register);
 
@@ -19,10 +19,10 @@ routes.post("/login", login);
 
 routes.post("/logout", authenticate, logout);
 
-routes.post("/uploadZip", authenticate, uploadZip);
+routes.post("/uploadZip", uploadZip);
 
 routes.post("/downloadZip/:file_id", authenticate, downloadZip);
 
-routes.post("/startProcess", authenticate, startProcess);
+routes.post("/startProcess", startProcess);
 
 module.exports = routes;
