@@ -5,7 +5,6 @@ const fs = require("fs");
 const User = require("../models/User");
 const Job = require("../models/JobList");
 const Guest = require("../models/Guest");
-const bufferImage = require("buffer-image");
 const singleFileUpload = require("../helper/singleFileUpload");
 
 const register = async (req, res) => {
@@ -67,48 +66,33 @@ const logout = (req, res) => {
 const getUser = async (req, res) => {
   try {
     const user = await User.findOne({ token: req.query.token });
-    if (user) {
-      const folders = await Job.find({ user_id: user.id }).sort({
-        createdAt: -1,
-      });
-      if (folders) {
-        try {
-          diretoryTreeToObj(
-            path.join(__dirname, "../uploads/" + user.id), //nii.giz
-            (err, data) => {
-              if (err) console.error(err);
-              return res
-                .status(200)
-                .json({ user: user, directories: data, folders: folders });
-            }
-          );
-        } catch (err) {
-          res.status(400).json(err);
-        }
-      }
-      return res
-        .status(200)
-        .json({ user: user, directories: [], folders: folders });
-    }
+    const guest = await Guest.findOne({ guest: req.query.guestId });
+    const folders = await Job.find({ user_id: user.id }).sort({
+      createdAt: -1,
+    });
 
-    if (req.query.guestId) {
-      const guest = await Guest.findOne({ guest: req.query.guestId });
-      if (guest.fileName) {
+    if (folders[0].fileName || guest.fileName) {
+      try {
         diretoryTreeToObj(
-          path.join(__dirname, "../uploads/" + req.query.guestId), //nii.giz
-          async function (err, data) {
+          path.join(
+            __dirname,
+            "../uploads/" + user.id || req.query.guestId + "/"
+          ), //nii.giz
+          (err, data) => {
             if (err) console.error(err);
-            res.json({
-              user: guest,
+            res.status(200).json({
+              user: user,
               directories: data,
+              folders: folders || [],
             });
           }
         );
+      } catch (err) {
+        res.status(400).json(err);
       }
     }
-    return res.status(200).json({ status: true });
   } catch (err) {
-    return res.status(204).json(err);
+    res.status(204).json(err);
   }
 };
 
@@ -229,11 +213,11 @@ const startProcess = async (req, res) => {
   }
 };
 
-var diretoryTreeToObj = (dir, done) => {
+var diretoryTreeToObj = function (dir, done) {
   var results = [];
 
   fs.readdir(dir, function (err, list) {
-    if (err) return;
+    if (err) return done(err);
 
     var pending = list.length;
 
@@ -246,7 +230,7 @@ var diretoryTreeToObj = (dir, done) => {
 
     list.forEach(function (file) {
       file = path.resolve(dir, file);
-      fs.stat(file, (err, stat) => {
+      fs.stat(file, function (err, stat) {
         if (stat && stat.isDirectory()) {
           diretoryTreeToObj(file, function (err, res) {
             results.push({
@@ -254,14 +238,14 @@ var diretoryTreeToObj = (dir, done) => {
               id: Math.round(Math.random(1000) + 12),
               nodes: res,
             });
-            if (!--pending) return;
+            if (!--pending) done(null, results);
           });
         } else {
           results.push({
             id: Math.round(Math.random(1000) + 12),
             label: path.basename(file),
           });
-          if (!--pending) return;
+          if (!--pending) done(null, results);
         }
       });
     });
