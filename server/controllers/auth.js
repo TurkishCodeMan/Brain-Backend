@@ -65,11 +65,14 @@ const logout = (req, res) => {
 
 const getUser = async (req, res) => {
   try {
-    const user = await User.findOne({ token: req.query.token });
-    const guest = await Guest.findOne({ guest: req.query.guestId });
-    const folders = await Job.find({ user_id: user.id }).sort({
-      createdAt: -1,
-    });
+    if (req.query.guestId) {
+      var guest = await Guest.findOne({ guest: req.query.guestId });
+    } else {
+      var user = await User.findOne({ token: req.query.token });
+      var folders = await Job.find({ user_id: user.id }).sort({
+        createdAt: -1,
+      });
+    }
 
     if (folders[0].fileName || guest.fileName) {
       try {
@@ -81,8 +84,8 @@ const getUser = async (req, res) => {
           (err, data) => {
             if (err) console.error(err);
             res.status(200).json({
-              user: user,
-              directories: data,
+              user: user || req.query.guestId,
+              directories: data || [],
               folders: folders || [],
             });
           }
@@ -91,6 +94,11 @@ const getUser = async (req, res) => {
         res.status(400).json(err);
       }
     }
+    res.status(200).json({
+      user: user || req.query.guestId,
+      directories: data || [],
+      folders: folders || [],
+    });
   } catch (err) {
     res.status(204).json(err);
   }
@@ -123,8 +131,9 @@ const startProcess = async (req, res) => {
   const user = await User.findOne({ token: req.query.token });
   const { spawn } = require("child_process");
   var dataToSend;
+  var dataTo;
   //Job için fileName de alınması lazım
-  if (user.id) {
+  if (req.query.token) {
     await Job.findOneAndUpdate(
       {
         user_id: user.id,
@@ -137,18 +146,20 @@ const startProcess = async (req, res) => {
         new: true,
       }
     );
+
     const python = spawn("python", [
       __dirname + "/mri_read_and_convert.py",
       path.join(__dirname, "../uploads/" + user.id + "/" + req.query.fileName),
     ]);
     python.stdout.on("data", (data) => {
       console.log("Pipe data from python script ...");
-      dataToSend = String(data).replace(/(\r\n|\n|\r)/gm, "");
+      dataTo = String(data).replace(/(\r\n|\n|\r)/gm, "");
     });
 
     python.stderr.on("data", (data) => {
       console.error(`stderr: ${data}`);
     });
+
     python.on("close", async (code) => {
       console.log(`child process close all stdio with code ${code}`);
       await Job.findOneAndUpdate(
@@ -160,10 +171,31 @@ const startProcess = async (req, res) => {
           new: true,
         }
       );
-      res.sendFile(dataToSend);
+      const pyt = spawn("python", [__dirname + "/filtering.py", dataTo]);
+      pyt.stdout.on("data", (data) => {
+        console.log("Pipe data from python script ...");
+        dataToSend = String(data).replace(/(\r\n|\n|\r)/gm, "");
+      });
+
+      pyt.stderr.on("data", (data) => {
+        console.error(`stderr: ${data}`);
+      });
+      pyt.on("close", async (code) => {
+        console.log(`child process close all stdio with code ${code}`);
+        await Job.findOneAndUpdate(
+          { user_id: user.id },
+          {
+            status: "Completed",
+          },
+          {
+            new: true,
+          }
+        );
+        res.sendFile(dataToSend);
+      });
     });
   } else {
-    const folder = await Guest.findOneAndUpdate(
+    await Guest.findOneAndUpdate(
       {
         guestId: req.query.guestId,
         fileName: req.query.fileName,
@@ -177,7 +209,6 @@ const startProcess = async (req, res) => {
     );
     const python = spawn("python", [
       __dirname + "/mri_read_and_convert.py",
-      folder.fileName,
       path.join(
         __dirname,
         "../uploads/" + req.query.guestId + "/" + req.query.fileName
@@ -185,7 +216,7 @@ const startProcess = async (req, res) => {
     ]);
     python.stdout.on("data", (data) => {
       console.log("Pipe data from python script ...");
-      dataToSend = String(data);
+      dataTo = String(data).replace(/(\r\n|\n|\r)/gm, "");
     });
 
     python.stderr.on("data", (data) => {
@@ -202,13 +233,28 @@ const startProcess = async (req, res) => {
           new: true,
         }
       );
+      const pyt = spawn("python", [__dirname + "/filtering.py", dataTo]);
+      pyt.stdout.on("data", (data) => {
+        console.log("Pipe data from python script ...");
+        dataToSend = String(data).replace(/(\r\n|\n|\r)/gm, "");
+      });
 
-      // res.send({
-      //   status: "Completed",
-      //   image: image,
-      //   PSNR: dataToSend,
-      // });
-      res.sendFile(dataToSend);
+      pyt.stderr.on("data", (data) => {
+        console.error(`stderr: ${data}`);
+      });
+      pyt.on("close", async (code) => {
+        console.log(`child process close all stdio with code ${code}`);
+        await Guest.findOneAndUpdate(
+          { guestId: req.query.guestId },
+          {
+            status: "Completed",
+          },
+          {
+            new: true,
+          }
+        );
+        res.sendFile(dataToSend);
+      });
     });
   }
 };
